@@ -5,6 +5,7 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const CostCalculator = require('../utils/costCalculator')
 const pricingService = require('../services/pricingService')
+const apiKeyService = require('../services/apiKeyService')
 const config = require('../../config/config')
 
 // Helper: Find API Key by ID or Name
@@ -551,6 +552,112 @@ router.post('/api-key/create', authenticatePartner, async (req, res) => {
     })
   } catch (error) {
     logger.error('❌ Partner create API Key error:', error)
+    return res.status(500).json({
+      code: 1003,
+      msg: error.message || 'Internal server error',
+      data: null
+    })
+  }
+})
+
+// 🔧 批量更新 API Key 配置
+router.post('/api-key/update-config', authenticatePartner, async (req, res) => {
+  try {
+    const { configs, claude_account_id } = req.body
+
+    // 参数验证
+    if (!configs || !Array.isArray(configs)) {
+      return res.status(400).json({
+        code: 1001,
+        msg: 'configs is required and must be an array',
+        data: null
+      })
+    }
+
+    if (configs.length === 0 || configs.length > 100) {
+      return res.status(400).json({
+        code: 1001,
+        msg: 'configs length must be between 1 and 100',
+        data: null
+      })
+    }
+
+    // 验证 Claude 账户（如果提供）
+    if (claude_account_id) {
+      const claudeConsoleAccountService = require('../services/account/claudeConsoleAccountService')
+      const account = await claudeConsoleAccountService.getAccount(claude_account_id)
+
+      if (!account || !account.isActive) {
+        return res.status(400).json({
+          code: 1001,
+          msg: 'Claude account not found or inactive',
+          data: null
+        })
+      }
+    }
+
+    logger.info(`🔧 Partner updating API Key configs: count=${configs.length}`)
+
+    const failed = []
+    let successCount = 0
+
+    // 逐个更新配置
+    for (const config of configs) {
+      try {
+        const apiKey = await findApiKey(config.key_id, null)
+
+        if (!apiKey) {
+          failed.push({
+            key_id: config.key_id,
+            reason: 'API Key not found'
+          })
+          continue
+        }
+
+        // 准备更新数据
+        const updates = {}
+
+        // 更新服务倍率 - 只更新 claude 服务的倍率
+        const rate = Number(config.rate)
+        const currentServiceRates = apiKey.serviceRates || {}
+        updates.serviceRates = {
+          ...currentServiceRates,
+          claude: rate
+        }
+
+        // 更新绑定账户（如果提供）
+        if (claude_account_id) {
+          updates.claudeConsoleAccountId = claude_account_id
+        }
+
+        // 使用 apiKeyService 更新
+        await apiKeyService.updateApiKey(config.key_id, updates)
+
+        successCount++
+        logger.info(
+          `✅ Updated API Key config: ${config.key_id}, rate=${config.rate}${claude_account_id ? `, account=${claude_account_id}` : ''}`
+        )
+      } catch (error) {
+        logger.error(`❌ Failed to update API Key ${config.key_id}:`, error)
+        failed.push({
+          key_id: config.key_id,
+          reason: error.message || 'Unknown error'
+        })
+      }
+    }
+
+    return res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        total: configs.length,
+        success: successCount,
+        failed: failed.length,
+        failedDetails: failed
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Partner update config error:', error)
     return res.status(500).json({
       code: 1003,
       msg: error.message || 'Internal server error',

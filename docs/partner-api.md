@@ -27,6 +27,13 @@
 - **Content-Type**: `application/json`
 - **功能说明**: 查询 API Key 近 30 天的详细用量数据，包含每日用量和按模型维度的统计
 
+### 4. 批量更新 API Key 配置
+
+- **接口地址**: `POST /partner/api-key/update-config`
+- **认证方式**: SHA256 签名验证
+- **Content-Type**: `application/json`
+- **功能说明**: 批量更新 API Key 的配置信息，包括服务倍率和绑定的 Claude 账户 ID
+
 ## 验签机制
 
 ### 签名算法
@@ -344,6 +351,158 @@ SHA256: abc123...
   "data": null
 }
 ```
+
+---
+
+### 接口 4: 批量更新 API Key 配置
+
+#### 请求参数
+
+**请求体**
+
+```json
+{
+  "configs": [
+    {
+      "key_id": "xxx-xxx-xxx",
+      "rate": 2.1
+    },
+    {
+      "key_id": "yyy-yyy-yyy",
+      "rate": 2.7
+    },
+    {
+      "key_id": "zzz-zzz-zzz",
+      "rate": 3.2
+    }
+  ],
+  "claude_account_id": "account-uuid-here",
+  "sign": "ABC123..."
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| configs | array | 是 | 配置数组，每个元素包含 key_id 和 rate |
+| configs[].key_id | string | 是 | API Key ID |
+| configs[].rate | number | 是 | 服务倍率（2.1/2.7/3.2） |
+| claude_account_id | string | 否 | 绑定的 Claude 账户 ID（所有 key_id 共用） |
+| sign | string | 是 | SHA256 签名（大写十六进制） |
+
+**服务倍率档位说明**
+
+| 总费用限制 | 服务倍率 | 说明 |
+|-----------|---------|------|
+| $40 | 2.1 | 基础档 |
+| $200 | 2.7 | 标准档 |
+| $600 | 3.2 | 高级档 |
+
+**参数验证规则**
+
+1. `configs`: 必填，必须是数组，长度 1-100
+2. `configs[].key_id`: 必填，必须是有效的 API Key ID
+3. `configs[].rate`: 必填，必须是 2.1、2.7 或 3.2 之一
+4. `claude_account_id`: 可选，如果提供则必须是有效的 Claude 账户 ID
+
+#### 响应格式
+
+**成功响应**
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "total": 3,
+    "success": 2,
+    "failed": 1,
+    "failedDetails": [
+      {
+        "key_id": "zzz-zzz-zzz",
+        "reason": "API Key not found"
+      }
+    ]
+  }
+}
+```
+
+**响应字段说明**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | number | 状态码，0表示成功（部分成功也返回0），其他值表示错误 |
+| msg | string | 消息，成功时为"success" |
+| data | object | 业务数据 |
+| data.total | number | 处理的总条数 |
+| data.success | number | 成功更新的条数 |
+| data.failed | number | 失败的条数 |
+| data.failedDetails | array | 失败详情列表 |
+| data.failedDetails[].key_id | string | 失败的 API Key ID |
+| data.failedDetails[].reason | string | 失败原因 |
+
+**错误响应**
+
+```json
+{
+  "code": 1001,
+  "msg": "configs is required and must be an array",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 1001,
+  "msg": "configs length cannot exceed 100",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 1001,
+  "msg": "configs[0].key_id is required",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 1001,
+  "msg": "configs[0].rate is required and must be one of: 2.1, 2.7, 3.2",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 1001,
+  "msg": "Claude account not found or inactive",
+  "data": null
+}
+```
+
+#### 业务逻辑说明
+
+1. **批量验证**: 先验证所有请求参数的格式和取值范围
+2. **逐个处理**: 遍历 configs 数组，逐个更新 API Key 配置
+3. **错误隔离**: 某个 API Key 更新失败不影响其他 API Key 的更新
+4. **验证 API Key**: 检查 key_id 对应的 API Key 是否存在且未删除
+5. **验证服务倍率**: rate 必须是 2.1、2.7 或 3.2 之一
+6. **验证 Claude 账户**: 如果提供了 claude_account_id，必须验证该账户存在且状态为 active
+7. **更新配置**:
+   - 更新 API Key 的 rateMultiplier 字段
+   - 如果提供了 claude_account_id，更新所有 API Key 的 claudeConsoleAccountId 字段
+8. **返回结果**: 返回处理总数、成功数、失败数和失败详情（包含 key_id 和失败原因）
+
+#### 安全考虑
+
+1. **权限验证**: 通过 SHA256 签名验证请求合法性
+2. **参数验证**: 严格验证所有输入参数的格式和取值范围
+3. **批量限制**: 单次请求最多更新 100 个 API Key
+4. **账户验证**: 确保绑定的 Claude 账户存在且可用
+5. **错误隔离**: 单个更新失败不影响其他更新操作
+6. **审计日志**: 记录所有配置更新操作，便于追溯
 
 ---
 
