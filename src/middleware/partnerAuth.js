@@ -77,11 +77,30 @@ async function authenticatePartner(req, res, next) {
 
     // 4. 计算签名
     const secretKey = config.partnerApi?.secret || config.security?.jwtSecret || config.jwtSecret
+
+    // 记录签名计算过程
+    const sortedKeys = Object.keys(params).sort()
+    let signStr = ''
+    for (const key of sortedKeys) {
+      const value = params[key]
+      if (typeof value === 'object' && value !== null) {
+        signStr += `${key}=${JSON.stringify(value)}`
+      } else {
+        signStr += `${key}=${value}`
+      }
+      signStr += '&'
+    }
+    signStr = signStr.slice(0, -1)
+    const signStrWithKey = signStr + secretKey
+    logger.info(`🔐 Sign calculation: params="${signStr}", with_key="${signStrWithKey}"`)
+
     const expectedSignature = generateSignature(params, secretKey)
 
     // 5. 验证签名（不区分大小写）
     if (signature.toUpperCase() !== expectedSignature.toUpperCase()) {
-      logger.warn('❌ Partner auth failed: Invalid signature')
+      logger.warn(
+        `❌ Partner auth failed: Invalid signature. Expected: ${expectedSignature}, Received: ${signature}`
+      )
       return res.status(401).json({
         code: 401,
         msg: 'Invalid signature',
