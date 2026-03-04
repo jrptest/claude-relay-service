@@ -2189,7 +2189,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         .sendNotification('systemError', {
           title: 'Gemini API 非流式请求错误',
           platform: 'gemini',
-          apiKey: req.apiKey?.name || req.apiKey?.id || 'N/A',
+          apiKeyName: req.apiKey?.name || 'N/A',
           vendor,
           accountId,
           model: effectiveModel,
@@ -2948,7 +2948,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         .sendNotification('systemError', {
           title: 'Gemini API 流式响应错误',
           platform: 'gemini',
-          apiKey: req.apiKey?.name || req.apiKey?.id || 'N/A',
+          apiKeyName: req.apiKey?.name || req.apiKey?.id || 'N/A',
           vendor,
           accountId,
           model: effectiveModel,

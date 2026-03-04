@@ -316,7 +316,8 @@ class ClaudeConsoleRelayService {
           .sendNotification('systemError', {
             title: 'Claude Console 非流式请求错误',
             platform: 'claude-console',
-            apiKey: apiKeyData.name || apiKeyData.id,
+            apiKeyName: apiKeyData.name || '',
+            accountId,
             account: account?.name || accountId,
             status: response.status,
             error: rawErrorData
@@ -722,7 +723,8 @@ class ClaudeConsoleRelayService {
           .sendNotification('systemError', {
             title: 'Claude Console 流式请求错误',
             platform: 'claude-console',
-            apiKey: apiKeyData.name || apiKeyData.id,
+            apiKeyName: apiKeyData.name || '',
+            accountId,
             account: account?.name || accountId,
             requestId,
             error: rawErrorStr
@@ -880,7 +882,8 @@ class ClaudeConsoleRelayService {
                 .sendNotification('systemError', {
                   title: 'Claude Console 流式响应错误状态',
                   platform: 'claude-console',
-                  apiKey: apiKeyData.name || apiKeyData.id,
+                  apiKeyName: apiKeyData.name || '',
+                  accountId,
                   account: account?.name || accountId,
                   status: response.status,
                   error: errorDataForCheck
@@ -1311,7 +1314,8 @@ class ClaudeConsoleRelayService {
               .sendNotification('systemError', {
                 title: 'Claude Console 流式响应错误',
                 platform: 'claude-console',
-                apiKey: apiKeyData.name || apiKeyData.id,
+                apiKeyName: apiKeyData.name || '',
+                accountId,
                 account: account?.name || accountId,
                 error: rawErrorStr
               })
