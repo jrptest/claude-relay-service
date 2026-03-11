@@ -84,19 +84,32 @@ SHA256: abc123...
 {
   "name": "MyApp",
   "totalCostLimit": 100.0,
-  "claude_account_id": "account-uuid-here",
-  "rate": 2.1,
+  "claude_account_id": "group:381cb540-f33e-49d1-8fda-80348f8c456f",
+  "openai_account_id": "responses:openai-responses-account-uuid",
+  "claude_rate": 2.1,
+  "openai_rate": 1.8,
   "sign": "ABC123..."
 }
 ```
 
-| 参数              | 类型   | 必填 | 说明                        |
-| ----------------- | ------ | ---- | --------------------------- |
-| name              | string | 是   | API Key 的名称              |
-| totalCostLimit    | number | 否   | 总费用限制（美元）          |
-| claude_account_id | string | 否   | 绑定的 Claude 账户 ID       |
-| rate              | number | 否   | 服务倍率                    |
-| sign              | string | 是   | SHA256 签名（大写十六进制） |
+| 参数              | 类型   | 必填 | 说明                                                                                              |
+| ----------------- | ------ | ---- | ------------------------------------------------------------------------------------------------- |
+| name              | string | 是   | API Key 的名称                                                                                    |
+| totalCostLimit    | number | 否   | 总费用限制（美元）                                                                                |
+| claude_account_id | string | 否   | 绑定的 Claude 账户 ID；普通 ID 写入 `claudeConsoleAccountId`，`group:` 格式写入 `claudeAccountId` |
+| openai_account_id | string | 否   | 绑定的 OpenAI 账户 ID；支持普通 ID、`group:...`、`responses:...`，内部映射到 `openaiAccountId`    |
+| claude_rate       | number | 否   | Claude 服务倍率，内部映射到 `serviceRates.claude`                                                 |
+| openai_rate       | number | 否   | OpenAI/Codex 服务倍率，内部映射到 `serviceRates.codex`                                            |
+| rate              | number | 否   | 兼容旧参数，等同于 `claude_rate`；若同时提供则 `claude_rate` 优先                                 |
+| sign              | string | 是   | SHA256 签名（大写十六进制）                                                                       |
+
+示例说明：
+
+- `claude_account_id` 示例使用了 `group:` 分组绑定格式；如果传普通账户 ID，则会写入 `claudeConsoleAccountId`
+- `openai_account_id` 示例使用了 `responses:` 前缀；实际也支持普通账户 ID 和 `group:...` 前缀
+- 可参考的典型格式：
+  - `claude_account_id`: `claude-console-account-uuid` / `group:group-uuid`
+  - `openai_account_id`: `openai-account-uuid` / `group:group-uuid` / `responses:openai-responses-account-uuid`
 
 #### 响应格式
 
@@ -138,8 +151,14 @@ SHA256: abc123...
 **说明**
 
 - 标签自动设置为 `uni-agent`
-- Claude 专属账号自动绑定到 `FoxCode` 账户
-- 权限固定为 `claude`，只允许访问 Claude 服务
+- 未传 `claude_account_id` 时，会自动绑定默认 Claude 账户
+- `claude_account_id` 为普通 ID 时写入 `claudeConsoleAccountId`；为 `group:` 格式时写入 `claudeAccountId`
+- `claudeAccountId` 与 `claudeConsoleAccountId` 只会有一个字段有值
+- 传入 `openai_account_id` 时，会额外写入 `openaiAccountId`
+- 默认权限包含 `claude`；传入 `openai_account_id` 时，`permissions` 会额外包含 `openai`
+- 传入 `claude_rate` / `openai_rate` 时，会分别写入 `serviceRates.claude` / `serviceRates.codex`
+- 旧 `rate` 参数仍兼容，但建议迁移到 `claude_rate`
+- 所有新增参数在传入时也必须参与签名计算
 - API Key 创建后自动激活
 
 ---
