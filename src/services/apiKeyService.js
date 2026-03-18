@@ -1537,7 +1537,8 @@ class ApiKeyService {
     accountId = null,
     accountType = null,
     timestamp = null,
-    serviceTier = null
+    serviceTier = null,
+    extra = {}
   ) {
     try {
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
@@ -1652,7 +1653,8 @@ class ApiKeyService {
         totalTokens,
         cost: Number(ratedCost.toFixed(6)),
         realCost: Number(realCost.toFixed(6)),
-        realCostBreakdown: costInfo && costInfo.costs ? costInfo.costs : undefined
+        realCostBreakdown: costInfo && costInfo.costs ? costInfo.costs : undefined,
+        ...(process.env.ENABLE_USAGE_DETAIL === 'true' ? extra : {})
       })
 
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
@@ -1711,7 +1713,8 @@ class ApiKeyService {
     usageObject,
     model = 'unknown',
     accountId = null,
-    accountType = null
+    accountType = null,
+    extra = {}
   ) {
     try {
       // 提取 token 数量
@@ -1906,7 +1909,8 @@ class ApiKeyService {
           ephemeral5m: costInfo.ephemeral5mCost || 0,
           ephemeral1h: costInfo.ephemeral1hCost || 0
         },
-        isLongContext: costInfo.isLongContextRequest || false
+        isLongContext: costInfo.isLongContextRequest || false,
+        ...(process.env.ENABLE_USAGE_DETAIL === 'true' ? extra : {})
       }
 
       await redis.addUsageRecord(keyId, usageRecord)
@@ -2391,7 +2395,6 @@ class ApiKeyService {
       const days = periodDays[period] || 7
 
       // 计算起始日期：今天减去 (days - 1) 天
-      const endDate = new Date()
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - (days - 1))
 
@@ -2426,7 +2429,6 @@ class ApiKeyService {
       } else {
         // 扫描这些 Key 使用过的所有模型
         const modelSet = new Set()
-        const client = redis.getClientSafe()
         // 并行扫描所有 Key 的 alltime 模型记录
         await Promise.all(
           keyIds.map(async (keyId) => {
@@ -2492,7 +2494,9 @@ class ApiKeyService {
 
       // 处理结果
       results.forEach(([err, data], index) => {
-        if (err || !data) return
+        if (err || !data) {
+          return
+        }
 
         const query = queryMap[index]
 
@@ -2543,7 +2547,8 @@ class ApiKeyService {
             modelMap[query.model].outputTokens += outputTokens
             modelMap[query.model].cacheCreateTokens += cacheCreateTokens
             modelMap[query.model].cacheReadTokens += cacheReadTokens
-            modelMap[query.model].totalTokens += inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+            modelMap[query.model].totalTokens +=
+              inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
             modelMap[query.model].cost += cost
 
             // 如果有模型过滤，Daily Stats 必须从这里累加
